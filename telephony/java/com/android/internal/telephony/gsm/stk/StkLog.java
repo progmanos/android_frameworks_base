@@ -19,7 +19,7 @@ package com.android.internal.telephony.gsm.stk;
 import android.util.Log;
 
 public abstract class StkLog {
-    static final boolean DEBUG = true;
+    static final boolean DEBUG = false;
 
     public static void d(Object caller, String msg) {
         if (!DEBUG) {

@@ -38,7 +38,7 @@ import java.util.LinkedList;
 public class FullBackupAgent extends BackupAgent {
     // !!! TODO: turn off debugging
     private static final String TAG = "FullBackupAgent";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     @Override
     public void onBackup(ParcelFileDescriptor oldState, BackupDataOutput data,

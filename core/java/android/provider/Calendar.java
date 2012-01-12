@@ -1230,7 +1230,7 @@ public final class Calendar {
         public static final Uri CONTENT_URI_BY_INSTANCE =
             Uri.parse("content://" + AUTHORITY + "/calendar_alerts/by_instance");
 
-        private static final boolean DEBUG = true;
+        private static final boolean DEBUG = false;
 
         public static final Uri insert(ContentResolver cr, long eventId,
                 long begin, long end, long alarmTime, int minutes) {

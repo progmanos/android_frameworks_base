@@ -77,8 +77,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
     private static final String TAG = "GpsLocationProvider";
 
-    private static final boolean DEBUG = true;
-    private static final boolean VERBOSE = true;
+    private static final boolean DEBUG = false;
+    private static final boolean VERBOSE = false;
 
     // these need to match GpsPositionMode enum in gps.h
     private static final int GPS_POSITION_MODE_STANDALONE = 0;

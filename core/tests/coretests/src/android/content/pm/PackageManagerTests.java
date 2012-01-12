@@ -172,7 +172,7 @@ public class PackageManagerTests extends AndroidTestCase {
         PackageInstallObserver observer = new PackageInstallObserver();
         final boolean received = false;
         mContext.registerReceiver(receiver, receiver.filter);
-        final boolean DEBUG = true;
+        final boolean DEBUG = false;
         try {
             // Wait on observer
             synchronized(observer) {
