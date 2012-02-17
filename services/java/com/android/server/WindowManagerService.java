@@ -211,7 +211,7 @@ public class WindowManagerService extends IWindowManager.Stub
      * management of the screen during rotation.
      * @hide
      */
-    static final boolean CUSTOM_SCREEN_ROTATION = true;
+    static final boolean CUSTOM_SCREEN_ROTATION = SystemProperties.getBoolean("persist.sys.rotationanimation",true);
     
     // Maximum number of milliseconds to wait for input event injection.
     // FIXME is this value reasonable?
@@ -4588,7 +4588,7 @@ public class WindowManagerService extends IWindowManager.Stub
             Slog.i(TAG, "Setting rotation to " + rotation + ", animFlags=" + animFlags);
             mInputManager.setDisplayOrientation(0, rotation);
             if (mDisplayEnabled) {
-                if (CUSTOM_SCREEN_ROTATION) {
+                if (CUSTOM_SCREEN_ROTATION && mPolicy.isScreenOn()) {
                     Surface.freezeDisplay(0);
                     Surface.openTransaction();
                     if (mScreenRotationAnimation != null) {
@@ -10079,6 +10079,13 @@ public class WindowManagerService extends IWindowManager.Stub
             return;
         }
 
+        /* We might have a null mFxSession here if the user has
+           the lock-screen disabled.*/
+        if (mFxSession == null) {
+            mFxSession = new SurfaceSession();
+        }
+
+
         mScreenFrozenLock.acquire();
 
         long now = SystemClock.uptimeMillis();
@@ -10111,11 +10118,11 @@ public class WindowManagerService extends IWindowManager.Stub
             Debug.startMethodTracing(file.toString(), 8 * 1024 * 1024);
         }
 
-        if (CUSTOM_SCREEN_ROTATION) {
-            if (mScreenRotationAnimation != null && mScreenRotationAnimation.isAnimating()) {
-                mScreenRotationAnimation.kill();
-                mScreenRotationAnimation = null;
-            }
+        if (mScreenRotationAnimation != null && mScreenRotationAnimation.isAnimating()) {
+            mScreenRotationAnimation.kill();
+            mScreenRotationAnimation = null;
+        }
+        if (CUSTOM_SCREEN_ROTATION && mPolicy.isScreenOn()) {
             if (mScreenRotationAnimation == null) {
                 mScreenRotationAnimation = new ScreenRotationAnimation(mContext,
                         mDisplay, mFxSession);
@@ -10142,14 +10149,12 @@ public class WindowManagerService extends IWindowManager.Stub
             Debug.stopMethodTracing();
         }
 
-        if (CUSTOM_SCREEN_ROTATION) {
-            if (mScreenRotationAnimation != null) {
-                if (mScreenRotationAnimation.dismiss(MAX_ANIMATION_DURATION,
-                        mTransitionAnimationScale)) {
-                    requestAnimationLocked(0);
-                } else {
-                    mScreenRotationAnimation = null;
-                }
+        if (mScreenRotationAnimation != null) {
+            if (mScreenRotationAnimation.dismiss(MAX_ANIMATION_DURATION,
+                    mTransitionAnimationScale)) {
+                requestAnimationLocked(0);
+            } else {
+                mScreenRotationAnimation = null;
             }
         } else {
             Surface.unfreezeDisplay(0);
