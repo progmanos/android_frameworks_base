@@ -25,7 +25,6 @@
 
 #include <utils/Vector.h>
 
-#include <gui/SurfaceTexture.h>
 #include <surfaceflinger/Surface.h>
 #include <camera/Camera.h>
 #include <binder/IMemory.h>
@@ -635,32 +634,14 @@ static void android_hardware_Camera_cancelAutoFocus(JNIEnv *env, jobject thiz)
     }
 }
 
-static void android_hardware_Camera_takePicture(JNIEnv *env, jobject thiz, int msgType)
+static void android_hardware_Camera_takePicture(JNIEnv *env, jobject thiz)
 {
     LOGV("takePicture");
     JNICameraContext* context;
     sp<Camera> camera = get_native_camera(env, thiz, &context);
     if (camera == 0) return;
 
-    /*
-     * When CAMERA_MSG_RAW_IMAGE is requested, if the raw image callback
-     * buffer is available, CAMERA_MSG_RAW_IMAGE is enabled to get the
-     * notification _and_ the data; otherwise, CAMERA_MSG_RAW_IMAGE_NOTIFY
-     * is enabled to receive the callback notification but no data.
-     *
-     * Note that CAMERA_MSG_RAW_IMAGE_NOTIFY is not exposed to the
-     * Java application.
-     */
-    if (msgType & CAMERA_MSG_RAW_IMAGE) {
-        LOGV("Enable raw image callback buffer");
-        if (!context->isRawImageCallbackBufferAvailable()) {
-            LOGV("Enable raw image notification, since no callback buffer exists");
-            msgType &= ~CAMERA_MSG_RAW_IMAGE;
-            msgType |= CAMERA_MSG_RAW_IMAGE_NOTIFY;
-        }
-    }
-
-    if (camera->takePicture(msgType) != NO_ERROR) {
+    if (camera->takePicture() != NO_ERROR) {
         jniThrowRuntimeException(env, "takePicture failed");
         return;
     }
@@ -686,7 +667,7 @@ static void android_hardware_Camera_setParameters(JNIEnv *env, jobject thiz, jst
 
 static jstring android_hardware_Camera_getParameters(JNIEnv *env, jobject thiz)
 {
-    LOGV("getParameters");
+    LOGD("getParameters in android_hardware_Camera.cpp");
     sp<Camera> camera = get_native_camera(env, thiz, NULL);
     if (camera == 0) return 0;
 
@@ -838,7 +819,7 @@ static JNINativeMethod camMethods[] = {
     "()V",
     (void *)android_hardware_Camera_cancelAutoFocus },
   { "native_takePicture",
-    "(I)V",
+    "()V",
     (void *)android_hardware_Camera_takePicture },
   { "native_setParameters",
     "(Ljava/lang/String;)V",

@@ -392,9 +392,11 @@ public:
     CameraParameters getParameters() const
     {
         LOGV("%s(%s)", __FUNCTION__, mName.string());
+	LOGD("getParameters in CameraHardwareInterface.h in libcameraservice");
         CameraParameters parms;
         if (mDevice->ops->get_parameters) {
             char *temp = mDevice->ops->get_parameters(mDevice);
+            LOGD("CameraHardwareInterface: getParameters returned value from CameraHal: %s", temp);
             String8 str_parms(temp);
             if (mDevice->ops->put_parameters)
                 mDevice->ops->put_parameters(mDevice, temp);
@@ -411,6 +413,7 @@ public:
     status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
     {
         LOGV("%s(%s)", __FUNCTION__, mName.string());
+        LOGD("sendCommand: %s %d %d %d", __FUNCTION__, cmd, arg1, arg2);
         if (mDevice->ops->send_command)
             return mDevice->ops->send_command(mDevice, cmd, arg1, arg2);
         return INVALID_OPERATION;
@@ -685,6 +688,18 @@ private:
     data_callback_timestamp mDataCbTimestamp;
     void *mCbUser;
 };
+
+/**
+ * The functions need to be provided by the camera HAL.
+ *
+ * If getNumberOfCameras() returns N, the valid cameraId for getCameraInfo()
+ * and openCameraHardware() is 0 to N-1.
+ */
+//extern "C" int HAL_getNumberOfCameras();
+extern "C" void HAL_getCameraInfo(int cameraId, struct CameraInfo* cameraInfo);
+/* HAL should return NULL if it fails to open camera hardware. */
+extern "C" sp<CameraHardwareInterface> HAL_openCameraHardware(int cameraId);
+
 
 };  // namespace android
 

@@ -1,6 +1,7 @@
 /*
 **
 ** Copyright 2008, The Android Open Source Project
+** Copyright (C) 2010, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -47,6 +48,13 @@ enum {
     RECORDING_ENABLED,
     RELEASE_RECORDING_FRAME,
     STORE_META_DATA_IN_BUFFERS,
+#ifdef USE_GETBUFFERINFO
+    GET_BUFFER_INFO,
+#endif
+#ifdef MOTO_CUSTOM_PARAMETERS
+    GET_CUSTOM_PARAMETERS,
+    SET_CUSTOM_PARAMETERS,
+#endif
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -99,6 +107,22 @@ public:
         data.writeInt32(flag);
         remote()->transact(SET_PREVIEW_CALLBACK_FLAG, data, &reply);
     }
+
+#ifdef USE_GETBUFFERINFO
+    // get the recording buffer information.
+    status_t getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
+    {
+        status_t ret;
+        LOGV("getBufferInfo");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        data.writeStrongBinder(Frame->asBinder());
+        remote()->transact(GET_BUFFER_INFO, data, &reply);
+        ret = reply.readInt32();
+        *alignedSize = reply.readInt32();
+        return ret;
+    }
+#endif
 
     // start preview mode, must call setPreviewDisplay first
     status_t startPreview()
@@ -200,12 +224,11 @@ public:
     }
 
     // take a picture - returns an IMemory (ref-counted mmap)
-    status_t takePicture(int msgType)
+    status_t takePicture()
     {
-        LOGV("takePicture: 0x%x", msgType);
+        LOGV("takePicture");
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
-        data.writeInt32(msgType);
         remote()->transact(TAKE_PICTURE, data, &reply);
         status_t ret = reply.readInt32();
         return ret;
@@ -227,15 +250,42 @@ public:
     {
         LOGV("getParameters");
         Parcel data, reply;
+        LOGD("getParameters in ICamera.cpp");
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
         remote()->transact(GET_PARAMETERS, data, &reply);
         return reply.readString8();
     }
+
+    #ifdef MOTO_CUSTOM_PARAMETERS
+    // set preview/capture custom parameters - key/value pairs
+    status_t setCustomParameters(const String8& params)
+    {
+        LOGV("setCustomParameters");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        data.writeString8(params);
+        remote()->transact(SET_CUSTOM_PARAMETERS, data, &reply);
+        return reply.readInt32();
+    }
+
+    // get preview/capture custom parameters - key/value pairs
+    String8 getCustomParameters() const
+    {
+        LOGV("getCustomParameters");
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        remote()->transact(GET_CUSTOM_PARAMETERS, data, &reply);
+        return reply.readString8();
+    }
+    #endif
+
     virtual status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
     {
         LOGV("sendCommand");
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        LOGD("sendCommand: getInterfaceDescriptor: %s , cmd: %d , arg1: %d , arg2: %d", ICamera::getInterfaceDescriptor(),
+                cmd, arg1, arg2);
         data.writeInt32(cmd);
         data.writeInt32(arg1);
         data.writeInt32(arg2);
@@ -301,6 +351,17 @@ status_t BnCamera::onTransact(
             setPreviewCallbackFlag(callback_flag);
             return NO_ERROR;
         } break;
+#ifdef USE_GETBUFFERINFO
+        case GET_BUFFER_INFO:{
+            LOGV("GET_BUFFER_INFO");
+            CHECK_INTERFACE(ICamera, data, reply);
+            sp<IMemory> Frame = interface_cast<IMemory>(data.readStrongBinder());
+            size_t alignedSize;
+            reply->writeInt32(getBufferInfo(Frame, &alignedSize));
+            reply->writeInt32(alignedSize);
+            return NO_ERROR;
+        } break;
+#endif
         case START_PREVIEW: {
             LOGV("START_PREVIEW");
             CHECK_INTERFACE(ICamera, data, reply);
@@ -366,8 +427,7 @@ status_t BnCamera::onTransact(
         case TAKE_PICTURE: {
             LOGV("TAKE_PICTURE");
             CHECK_INTERFACE(ICamera, data, reply);
-            int msgType = data.readInt32();
-            reply->writeInt32(takePicture(msgType));
+            reply->writeInt32(takePicture());
             return NO_ERROR;
         } break;
         case SET_PARAMETERS: {
@@ -383,6 +443,21 @@ status_t BnCamera::onTransact(
              reply->writeString8(getParameters());
             return NO_ERROR;
          } break;
+        #ifdef MOTO_CUSTOM_PARAMETERS
+        case SET_CUSTOM_PARAMETERS: {
+            LOGV("SET_CUSTOM_PARAMETERS");
+            CHECK_INTERFACE(ICamera, data, reply);
+            String8 params(data.readString8());
+            reply->writeInt32(setCustomParameters(params));
+            return NO_ERROR;
+         } break;
+        case GET_CUSTOM_PARAMETERS: {
+            LOGV("GET_CUSTOM_PARAMETERS");
+            CHECK_INTERFACE(ICamera, data, reply);
+             reply->writeString8(getCustomParameters());
+            return NO_ERROR;
+         } break;
+        #endif
         case SEND_COMMAND: {
             LOGV("SEND_COMMAND");
             CHECK_INTERFACE(ICamera, data, reply);
@@ -416,3 +491,4 @@ status_t BnCamera::onTransact(
 // ----------------------------------------------------------------------------
 
 }; // namespace android
+

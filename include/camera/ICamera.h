@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +58,11 @@ public:
     // preview are handled.
     virtual void            setPreviewCallbackFlag(int flag) = 0;
 
+#ifdef USE_GETBUFFERINFO
+    // get the recording buffer information from HAL layer.
+    virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize) = 0;
+#endif
+
     // start preview mode, must call setPreviewDisplay first
     virtual status_t        startPreview() = 0;
 
@@ -84,20 +90,22 @@ public:
     // cancel auto focus
     virtual status_t        cancelAutoFocus() = 0;
 
-    /*
-     * take a picture.
-     * @param msgType the message type an application selectively turn on/off
-     * on a photo-by-photo basis. The supported message types are:
-     * CAMERA_MSG_SHUTTER, CAMERA_MSG_RAW_IMAGE, CAMERA_MSG_COMPRESSED_IMAGE,
-     * and CAMERA_MSG_POSTVIEW_FRAME. Any other message types will be ignored.
-     */
-    virtual status_t        takePicture(int msgType) = 0;
+    // take a picture
+    virtual status_t        takePicture() = 0;
 
     // set preview/capture parameters - key/value pairs
     virtual status_t        setParameters(const String8& params) = 0;
 
     // get preview/capture parameters - key/value pairs
     virtual String8         getParameters() const = 0;
+
+    #ifdef MOTO_CUSTOM_PARAMETERS
+    // set preview/capture custom parameters - key/value pairs
+    virtual status_t        setCustomParameters(const String8& params) = 0;
+
+    // get preview/capture custom parameters - key/value pairs
+    virtual String8         getCustomParameters() const = 0;
+    #endif
 
     // send command to camera driver
     virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2) = 0;

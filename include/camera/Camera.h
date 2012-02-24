@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2008 HTC Inc.
+ * Copyright (C) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,7 +87,12 @@ public:
 
             // pass the buffered Surface to the camera service
             status_t    setPreviewDisplay(const sp<Surface>& surface);
-
+          
+#ifdef USE_GETBUFFERINFO
+            // query the recording buffer information from HAL layer.
+            status_t    getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
+#endif
+ 
             // pass the buffered ISurfaceTexture to the camera service
             status_t    setPreviewTexture(const sp<ISurfaceTexture>& surfaceTexture);
 
@@ -117,13 +124,23 @@ public:
             status_t    cancelAutoFocus();
 
             // take a picture - picture returned from callback
-            status_t    takePicture(int msgType);
+            status_t    takePicture();
 
             // set preview/capture parameters - key/value pairs
             status_t    setParameters(const String8& params);
 
+            #ifdef MOTO_CUSTOM_PARAMETERS
+            // set preview/capture parameters - key/value pairs
+            status_t    setCustomParameters(const String8& params);
+            #endif
+
             // get preview/capture parameters - key/value pairs
             String8     getParameters() const;
+
+            #ifdef MOTO_CUSTOM_PARAMETERS
+            // get preview/capture parameters - key/value pairs
+            String8     getCustomParameters() const;
+            #endif
 
             // send command to camera driver
             status_t    sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
@@ -132,10 +149,10 @@ public:
             status_t    storeMetaDataInBuffers(bool enabled);
 
             void        setListener(const sp<CameraListener>& listener);
-            void        setRecordingProxyListener(const sp<ICameraRecordingProxyListener>& listener);
+           void        setRecordingProxyListener(const sp<ICameraRecordingProxyListener>& listener);
             void        setPreviewCallbackFlags(int preview_callback_flag);
 
-            sp<ICameraRecordingProxy> getRecordingProxy();
+             sp<ICameraRecordingProxy> getRecordingProxy();
 
     // ICameraClient interface
     virtual void        notifyCallback(int32_t msgType, int32_t ext, int32_t ext2);
@@ -157,7 +174,7 @@ public:
 
     private:
         sp<Camera>         mCamera;
-    };
+    }; 
 
 private:
                         Camera();
@@ -189,6 +206,7 @@ private:
 
             static  Mutex               mLock;
             static  sp<ICameraService>  mCameraService;
+
 };
 
 }; // namespace android

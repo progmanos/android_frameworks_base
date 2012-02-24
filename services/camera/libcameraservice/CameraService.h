@@ -94,6 +94,10 @@ private:
         virtual status_t        setPreviewDisplay(const sp<Surface>& surface);
         virtual status_t        setPreviewTexture(const sp<ISurfaceTexture>& surfaceTexture);
         virtual void            setPreviewCallbackFlag(int flag);
+#ifdef USE_GETBUFFERINFO
+        // get the recording buffers information from HAL Layer.
+        virtual status_t        getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize);
+#endif
         virtual status_t        startPreview();
         virtual void            stopPreview();
         virtual bool            previewEnabled();
@@ -104,9 +108,13 @@ private:
         virtual void            releaseRecordingFrame(const sp<IMemory>& mem);
         virtual status_t        autoFocus();
         virtual status_t        cancelAutoFocus();
-        virtual status_t        takePicture(int msgType);
+        virtual status_t        takePicture();
         virtual status_t        setParameters(const String8& params);
         virtual String8         getParameters() const;
+        #ifdef MOTO_CUSTOM_PARAMETERS
+        virtual status_t        setCustomParameters(const String8& params);
+        virtual String8         getCustomParameters() const;
+        #endif
         virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
     private:
         friend class CameraService;
@@ -127,6 +135,7 @@ private:
 
         // these are internal functions used to set up preview buffers
         status_t                registerPreviewBuffers();
+        status_t                setOverlay();
 
         // camera operation mode
         enum camera_mode {
@@ -180,6 +189,13 @@ private:
         int                             mCameraFacing;   // immutable after constructor
         pid_t                           mClientPid;
         sp<CameraHardwareInterface>     mHardware;       // cleared after disconnect()
+        bool                            mUseOverlay;     // immutable after constructor
+       // sp<OverlayRef>                  mOverlayRef;
+#if defined(USE_OVERLAY_FORMAT_YCbCr_420_SP) || defined(USE_OVERLAY_FORMAT_YCrCb_420_SP)
+        sp<Overlay>                     mOverlay;
+#endif
+        int                             mOverlayW;
+        int                             mOverlayH;
         int                             mPreviewCallbackFlag;
         int                             mOrientation;     // Current display orientation
         bool                            mPlayShutterSound;

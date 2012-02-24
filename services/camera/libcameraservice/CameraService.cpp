@@ -64,6 +64,24 @@ static int getCallingUid() {
     return IPCThreadState::self()->getCallingUid();
 }
 
+
+#if defined(BOARD_USE_FROYO_LIBCAMERA) || defined(BOARD_HAVE_HTC_FFC)
+#define HTC_SWITCH_CAMERA_FILE_PATH "/sys/android_camera2/htcwc"
+static void htcCameraSwitch(int cameraId)
+{
+    char buffer[16];
+    int fd;
+
+    if (access(HTC_SWITCH_CAMERA_FILE_PATH, W_OK) == 0) {
+        snprintf(buffer, sizeof(buffer), "%d", cameraId);
+
+        fd = open(HTC_SWITCH_CAMERA_FILE_PATH, O_WRONLY);
+        write(fd, buffer, strlen(buffer));
+        close(fd);
+    }
+}
+#endif
+
 // ----------------------------------------------------------------------------
 
 // This is ugly and only safe if we never re-create the CameraService, but
@@ -123,6 +141,26 @@ int32_t CameraService::getNumberOfCameras() {
     return mNumberOfCameras;
 }
 
+#if defined(BOARD_USE_FROYO_LIBCAMERA) || defined(BOARD_HAVE_HTC_FFC)
+#ifndef FIRST_CAMERA_FACING
+#define FIRST_CAMERA_FACING CAMERA_FACING_BACK
+#endif
+#ifndef FIRST_CAMERA_ORIENTATION
+#define FIRST_CAMERA_ORIENTATION 90
+#endif
+static const CameraInfo sCameraInfo[] = {
+    {
+        FIRST_CAMERA_FACING,
+        FIRST_CAMERA_ORIENTATION,  /* orientation */
+    },
+    {
+        CAMERA_FACING_FRONT,
+        270, /* orientation */
+    }
+};
+#endif
+
+
 status_t CameraService::getCameraInfo(int cameraId,
                                       struct CameraInfo* cameraInfo) {
     if (!mModule) {
@@ -134,9 +172,15 @@ status_t CameraService::getCameraInfo(int cameraId,
     }
 
     struct camera_info info;
+  //  status_t rc;
+//#if defined(BOARD_USE_FROYO_LIBCAMERA) || defined(BOARD_HAVE_HTC_FFC)
+   // memcpy(info, &sCameraInfo[cameraId], sizeof(CameraInfo));
+  //  rc = OK;
+//#else
     status_t rc = mModule->get_camera_info(cameraId, &info);
     cameraInfo->facing = info.facing;
     cameraInfo->orientation = info.orientation;
+//#endif
     return rc;
 }
 
@@ -198,12 +242,45 @@ sp<ICamera> CameraService::connect(
 
     char camera_device_name[10];
     snprintf(camera_device_name, sizeof(camera_device_name), "%d", cameraId);
-
+    
     hardware = new CameraHardwareInterface(camera_device_name);
     if (hardware->initialize(&mModule->common) != OK) {
         hardware.clear();
         return NULL;
     }
+/*#if defined(BOARD_USE_FROYO_LIBCAMERA) || defined(BOARD_HAVE_HTC_FFC)
+    htcCameraSwitch(cameraId);
+#endif */
+/*    hardware = HAL_openCameraHardware(cameraId);
+    if (hardware == NULL) {
+        LOGE("Fail to open camera hardware (id=%d)", cameraId);
+        return NULL;
+    } */
+
+/*#if defined(OMAP3_FW3A_LIBCAMERA) && defined(OMAP3_SECONDARY_CAMERA)
+    {
+        CameraParameters params(hardware->getParameters());
+        params.set("video-input", cameraId);
+        /* FFC doesn't export its own parameter list... :( */
+  /*      if (cameraId) {
+            params.set("picture-size-values", "1600x1200,1280x960,1280x720,640x480,512x384,320x240");
+            params.set("focus-mode-values", "fixed");
+        }
+        hardware->setParameters(params);
+    }
+#endif
+
+
+#if defined(BOARD_USE_REVERSE_FFC)
+    if (cameraId == 1) {
+        /* Change default parameters for the front camera */
+       /* CameraParameters params(hardware->getParameters());
+        params.set("front-camera-mode", "reverse"); // default is "mirror"
+        hardware->setParameters(params);
+        LOGI("CameraService::Tell the driver we want reverse mode");
+    }
+#endif */
+
 
     client = new Client(this, cameraClient, hardware, cameraId, info.facing, callingPid);
     mClient[cameraId] = client;
@@ -505,13 +582,14 @@ void CameraService::Client::disconnect() {
     mHardware->cancelPicture();
     // Release the hardware resources.
     mHardware->release();
-
+    
+    
     // Release the held ANativeWindow resources.
     if (mPreviewWindow != 0) {
         disconnectWindow(mPreviewWindow);
         mPreviewWindow = 0;
         mHardware->setPreviewWindow(mPreviewWindow);
-    }
+    } 
     mHardware.clear();
 
     mCameraService->removeClient(mCameraClient);
@@ -611,6 +689,20 @@ status_t CameraService::Client::startPreview() {
     LOG1("startPreview (pid %d)", getCallingPid());
     return startCameraMode(CAMERA_PREVIEW_MODE);
 }
+
+#ifdef USE_GETBUFFERINFO
+status_t CameraService::Client::getBufferInfo(sp<IMemory>& Frame, size_t *alignedSize)
+{
+    LOGD(" getBufferInfo : E");
+    if (mHardware == NULL) {
+        LOGE("mHardware is NULL, returning.");
+        Frame = NULL;
+        return INVALID_OPERATION;
+    }
+    return mHardware->getBufferInfo(Frame, alignedSize);
+}
+#endif
+
 
 // start recording mode
 status_t CameraService::Client::startRecording() {
@@ -771,24 +863,23 @@ status_t CameraService::Client::cancelAutoFocus() {
 }
 
 // take a picture - image is returned in callback
-status_t CameraService::Client::takePicture(int msgType) {
-    LOG1("takePicture (pid %d): 0x%x", getCallingPid(), msgType);
+status_t CameraService::Client::takePicture() {
+    LOG1("takePicture (pid %d)", getCallingPid());
 
     Mutex::Autolock lock(mLock);
     status_t result = checkPidAndHardware();
     if (result != NO_ERROR) return result;
 
-    if ((msgType & CAMERA_MSG_RAW_IMAGE) &&
+/*    if ((msgType & CAMERA_MSG_RAW_IMAGE) &&
         (msgType & CAMERA_MSG_RAW_IMAGE_NOTIFY)) {
         LOGE("CAMERA_MSG_RAW_IMAGE and CAMERA_MSG_RAW_IMAGE_NOTIFY"
                 " cannot be both enabled");
         return BAD_VALUE;
-    }
+    } */
 
     // We only accept picture related message types
     // and ignore other types of messages for takePicture().
-    int picMsgType = msgType
-                        & (CAMERA_MSG_SHUTTER |
+    int picMsgType = (CAMERA_MSG_SHUTTER |
                            CAMERA_MSG_POSTVIEW_FRAME |
                            CAMERA_MSG_RAW_IMAGE |
                            CAMERA_MSG_RAW_IMAGE_NOTIFY |
@@ -813,13 +904,42 @@ status_t CameraService::Client::setParameters(const String8& params) {
 
 // get preview/capture parameters - key/value pairs
 String8 CameraService::Client::getParameters() const {
+    LOGD("CameraService::Client::getParameters");
+
     Mutex::Autolock lock(mLock);
     if (checkPidAndHardware() != NO_ERROR) return String8();
 
     String8 params(mHardware->getParameters().flatten());
-    LOG1("getParameters (pid %d) (%s)", getCallingPid(), params.string());
+    LOGD("getParameters (pid %d) (%s)", getCallingPid(), params.string());
     return params;
 }
+
+#ifdef MOTO_CUSTOM_PARAMETERS
+// set preview/capture custom parameters - key/value pairs
+status_t CameraService::Client::setCustomParameters(const String8& params) {
+    LOG1("setCustomParameters (pid %d) (%s)", getCallingPid(), params.string());
+
+    Mutex::Autolock lock(mLock);
+    status_t result = checkPidAndHardware();
+    if (result != NO_ERROR) return result;
+
+
+    CameraParameters p(params);
+
+    return mHardware->setCustomParameters(p);
+}
+
+// get preview/capture custom parameters - key/value pairs
+String8 CameraService::Client::getCustomParameters() const {
+    Mutex::Autolock lock(mLock);
+    if (checkPidAndHardware() != NO_ERROR) return String8();
+
+    String8 params(mHardware->getCustomParameters().flatten());
+    LOG1("getCustomParameters (pid %d) (%s)", getCallingPid(), params.string());
+    return params;
+}
+#endif
+
 
 // enable shutter sound
 status_t CameraService::Client::enableShutterSound(bool enable) {
